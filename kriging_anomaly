@@ -1,0 +1,189 @@
+
+##########################################################################################
+#########################################################
+#############################
+
+# Function "kriging.anomaly" spatially downscale past or future climates using the change-factor approach (Wilby et al. 2004 - IPCC). Climate change trends (anomalies; difference for temperature and proportion for precipitation) are computed from current climates (base timeline) using the original gridded GCM's outputs, downscaled using ordinary kriging method, and applyed to the respective dowscaled current conditions to obtain downscaled past or future conditions.
+
+
+#############################
+#########################################################
+##########################################################################################
+
+
+##### Follows a brief description, with examples, for each argument from function "kriging.anomaly"
+
+## newGridFile => file name (in .txt and in quotes, for example: "global_grid.txt") indicating the centroids of grid cells for which pastFUT climate should be downscaled. It can be as much columns as you interest (e.g. cells id), but it is mandatory that two columns are named "long" and "lat":
+
+#(example for a newGrid file)
+#     long    lat
+#   -112.0 -111.5
+#   -112.0 -111.5  
+#   -112.0 -111.5  
+#   -111.5 -111.0  
+#   -111.5 -111.0  
+#     ...    ...
+
+
+
+## rawClimFile.baseline => file name (in .txt and in quotes, for example: "pr_CCSM_0k.txt") indicating the original gridded variable for BASELINE CLIMATES (pre-industrial, historical, modern), monthly simulated, from which climate change trands wil be computed. Such file must be 14 columns. It is mandatory that values for each month are in separated columns, as well as the spatial coordinates (long, lat), and that column names follow exactly the example below:
+
+## rawClimFile.pastFUT => file name (in .txt and in quotes, for example: "pr_CCSM_21k.txt") indicating the original gridded variable for PAST OR FUTURE CLIMATES, monthly simulated, which will be downscaled. Such file must be 14 columns. It is mandatory that values for each month are in separated columns, as well as the spatial coordinates (long, lat), and that column names follow exactly the example below:
+
+	#(example for rawClimFile.baseline and rawClimFile.pastFUT)
+	#(Because these files will be used to compute anomalies, it is mandatory that both files present exactly the same sequence for long/lat. Rather, a error message will be 		returned)
+	
+	#  long  lat    jan      fev      mar      abr      mai      jun      jul     ago      set      out      nov      dez
+	# 0.00  -90  4.089610 4.735232 6.441548 7.203468 7.052182 5.855716 5.673723 5.58491 6.276116 5.279049 4.488902 3.776155
+	# 1.25  -90  4.089322 4.735222 6.441547 7.203468 7.052182 5.855716 5.673723 5.58491 6.276116 5.279050 4.488889 3.775805
+	# 2.50  -90  4.089322 4.735240 6.441548 7.203468 7.052182 5.855716 5.673723 5.58491 6.276116 5.279050 4.488872 3.775640
+	# 3.75  -90  4.089715 4.735230 6.441548 7.203468 7.052182 5.855717 5.673723 5.58491 6.276116 5.279050 4.488895 3.775933
+	# 5.00  -90  4.089835 4.735240 6.441548 7.203468 7.052182 5.855717 5.673723 5.58491 6.276116 5.279050 4.488910 3.776165
+	# ...   ...    ...      ...      ...      ...       ...     ...       ...      ...     ...      ...     ...       ...
+
+
+
+## var => indicate if variable to be dowscaled is temperature (temp) or precipitation (prec). It is imprtant to compute anomalies (difference for temperature and proportion for precipitation);
+
+
+## nPoints => number of neighbor points around the focal cell should be considered to fit downscaling function (default indicates 12);
+
+
+## downscaledClimFile.baseline => file name (in .txt and in quotes, for example: "pr_CCSM_0k.txt") indicating the DOWNSCALED variable for BASELINE CLIMATES (pre-industrial, historical, modern), monthly simulated, from which downscaled climate change trands (anomalies) wil be applyied to obtain downscaled past or future climates. Such file must be 14 columns. It is mandatory that values for each month are in separated columns, as well as the spatial coordinates (long, lat), and that column names follow exactly the example above for rawClimFile.baseline and rawClimFile.pastFUT. Because past or future climates will be downscaled to newGridFile, it is mandatory that coordinates from 'downscaledClimFile.baseline' should indicate the newGridFile;
+
+
+## downOutput => indicate the name for the file to be saved in your working directory containing downscaled pastFUT climate (with file extention .txt and in quotes, for example: "pr_CCSM0_21k_downscaled.txt").
+
+
+
+
+
+kriging.anomaly <- function(newGridFile = " ", rawClimFile.baseline = " ", rawClimFile.pastFUT = " ", var =  "prec or temp", n.points = 12, downscaledClimFile.baseline = " ", downOutput = " ")
+{
+
+	library(sp)
+	library(gstat)
+
+	
+	#reading, testing and preparing files
+
+	newGrid <- read.table(newGridFile, h=T)
+	rawClim.baseline <- read.table(rawClimFile.baseline, h=T)
+	rawClim.pastFut <- read.table(rawClimFile.pastFUT, h=T)
+	downscaledClim.baseline <- read.table(downscaledClimFile.baseline, h=T)
+
+
+
+	if ("long" %in% colnames(newGrid)) {
+		if ("lat" %in% colnames(newGrid))
+			gridded(newGrid) <- ~long+lat
+		else stop(" ATTENTION: provide correct column names for *newGridFile*. It is mandatory *long* and *lat*. Please, see function' instructions!!! ")
+	} else stop(" ATTENTION: provide correct column names for *newGridFile*. It is mandatory *long* and *lat*. Please, see function' instructions!!! ")
+
+
+	if(ncol(rawClim.baseline) != 14) {stop(" ATTENTION: *rawClimFile.baseline* has not 14 columns. Please, see function' instructions!!! ")}
+
+	if(ncol(rawClim.pastFut) != 14) {stop(" ATTENTION: *rawClimFile.pastFut* has not 14 columns. Please, see function' instructions!!! ")}
+
+	if(ncol(downscaledClim.baseline) != 14) {stop(" ATTENTION: *downscaledClimFile.baseline* has not 14 columns. Please, see function' instructions!!! ")}
+
+	if(nrow(rawClim.baseline) != nrow(rawClim.pastFut)) {stop(" ATTENTION: *rawClimFile.baseline* and *rawClimFile.pastFut* are from different original grid!!! Make sure these files indicate simulations from a same GCM. ")}
+
+	if (any(c(colnames(rawClim.baseline) == c("long", "lat", "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez")) == FALSE)) {
+		stop(" ATTENTION: provide correct column names for *rawClimFile.baseline*. It is mandatory the strict names as follow: ***  long, lat, jan, fev, mar, abr, mai, jun, jul, ago, set, out, nov, dez  ***. Please, see function' instructions!!! ")} 
+
+	if (any(c(colnames(rawClim.pastFut) == c("long", "lat", "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez")) == FALSE)) {
+		stop(" ATTENTION: provide correct column names for *rawClimFile.pastFUT*. It is mandatory the strict names as follow: ***  long, lat, jan, fev, mar, abr, mai, jun, jul, ago, set, out, nov, dez  ***. Please, see function' instructions!!! ")} 
+	
+	if (any(c(colnames(downscaledClim.baseline) == c("long", "lat", "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez")) == FALSE)) {
+		stop(" ATTENTION: provide correct column names for *rawClimFile.baseline*. It is mandatory the strict names as follow: ***  long, lat, jan, fev, mar, abr, mai, jun, jul, ago, set, out, nov, dez  ***. Please, see function' instructions!!! ")} 
+
+	if(sum(rawClim.baseline[,"long"]-rawClim.pastFut[,"long"]) != 0) {stop(" ATTENTION: longitude collumn from *rawClimFile.baseline* and *rawClimFile.pastFut* indicates values with different sequences. Please, see function' instructions!!! ")}
+
+	if(sum(rawClim.baseline[,"lat"]-rawClim.pastFut[,"lat"]) != 0) {stop(" ATTENTION: latitude collumn from *rawClimFile.baseline* and *rawClimFile.pastFut* indicates values with different sequences. Please, see function' instructions!!! ")}
+
+
+	if(nrow(downscaledClim.baseline) != nrow(newGrid@coords)) {stop(" ATTENTION: *downscaledClimFile.baseline* is from different grid than *newGridFile*!!! Make sure both indicate identical grids. ")}
+
+	if(sum(downscaledClim.baseline[,"long"]-newGrid@coords[,"long"]) != 0) {stop(" ATTENTION: longitude collumn from *downscaledClim.baseline* and *newGridFile* indicates values with different sequences. Please, see function' instructions!!! ")}
+
+	if(sum(downscaledClim.baseline[,"lat"]-newGrid@coords[,"lat"]) != 0) {stop(" ATTENTION: longitude collumn from *downscaledClim.baseline* and *newGridFile* indicates values with different sequences. Please, see function' instructions!!! ")}
+
+
+	
+	
+	# computing anomaly
+	
+	anomaly <- matrix(NA, nrow(rawClim.baseline), 14, dimnames = list(c(), c("long", "lat", "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez")))
+	anomaly[,"long"] <- rawClim.baseline[,"long"]
+	anomaly[,"lat"] <- rawClim.baseline[,"lat"]
+
+	for(i in 3:14){
+	  partial.anomaly <- rawClim.pastFut[,i] - rawClim.baseline[,i]
+	  if(var == "prec"){partial.anomaly <- partial.anomaly/(rawClim.baseline[,i]+1)}	  
+	  anomaly[,i] <- partial.anomaly
+	}#ends for'i'
+	  
+	anomaly <- as.data.frame(anomaly)
+	coordinates(anomaly) <- ~long+lat
+		  
+	  
+
+	#fitting ordinary kriging and saving downscaled monthly variables
+
+	downscaledAnomaly <- matrix(NA, nrow(newGrid), 14, dimnames = list(c(), c("long", "lat", "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez")))
+
+	for(j in 1:12){
+		if(j == 1) {v <- variogram(jan~1, anomaly); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = jan~1, anomaly, newGrid, model = m, nmax= n.points)}
+		if(j == 2) {v <- variogram(fev~1, anomaly); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = fev~1, anomaly, newGrid, model = m, nmax= n.points)}
+		if(j == 3) {v <- variogram(mar~1, anomaly); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = mar~1, anomaly, newGrid, model = m, nmax= n.points)}
+		if(j == 4) {v <- variogram(abr~1, anomaly); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = abr~1, anomaly, newGrid, model = m, nmax= n.points)}
+		if(j == 5) {v <- variogram(mai~1, anomaly); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = mai~1, anomaly, newGrid, model = m, nmax= n.points)}
+		if(j == 6) {v <- variogram(jun~1, anomaly); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = jun~1, anomaly, newGrid, model = m, nmax= n.points)}
+		if(j == 7) {v <- variogram(jul~1, anomaly); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = jul~1, anomaly, newGrid, model = m, nmax= n.points)}
+		if(j == 8) {v <- variogram(ago~1, anomaly); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = ago~1, anomaly, newGrid, model = m, nmax= n.points)}
+		if(j == 9) {v <- variogram(set~1, anomaly); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = set~1, anomaly, newGrid, model = m, nmax= n.points)}
+		if(j == 10) {v <- variogram(out~1, anomaly); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = out~1, anomaly, newGrid, model = m, nmax= n.points)}
+		if(j == 11) {v <- variogram(nov~1, anomaly); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = nov~1, anomaly, newGrid, model = m, nmax= n.points)}
+		if(j == 12) {v <- variogram(dez~1, anomaly); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = dez~1, anomaly, newGrid, model = m, nmax= n.points)}
+	
+		downscaledAnomaly[,j+2] <- down.kriging@data$var1.pred
+	}#ends for'j'
+
+	downscaledAnomaly[,"long"] <- down.kriging@coords[,"long"] 
+	downscaledAnomaly[,"lat"] <- down.kriging@coords[,"lat"]
+
+
+
+	# applying downscaledAnomaly in downscaledClim.baseline to obtain the downscaled PAST or FUTURE climates
+
+	downscaledPastFut <- matrix(NA, nrow(newGrid), 14, dimnames = list(c(), c("long", "lat", "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez")))
+	
+	for(z in 3:14){
+		if(var == "prec") {downscaledPastFut[,z] <- (downscaledAnomaly[,z]*(downscaledClim.baseline[,z]+1)) + downscaledClim.baseline[,z]}
+		if (var == "temp"){downscaledPastFut[,z] <- downscaledAnomaly[,z] + downscaledClim.baseline[,z]} 
+	}#ends for'z'
+
+	downscaledPastFut[,"long"] <- downscaledClim.baseline[,"long"]
+	downscaledPastFut[,"lat"] <- downscaledClim.baseline[,"lat"]
+
+
+
+	write.table(downscaledPastFut, downOutput, row.names=F, sep="	")
+
+}#ends function 'kriging.PMIP3.completo'
+
+
+############################
+
+
+
+
+# to start the downscaling, run function 'kriging.anomaly' using a command like follows below. Remember first to paste function to the R-console and to set working directory where files 'newGrid', 'rawClimFile.baseline', 'rawClimFile.pastFUT', and 'downscaledClimFile.baseline' are saved into.
+
+
+###(examples of commands to run function 'kriging.anomaly')
+
+#   kriging.anomaly (newGridFile = "globalGrid_05resolution.txt", rawClimFile.baseline = "pr_CCSM_0k.txt", rawClimFile.pastFUT = "pr_CCSM_21k.txt", var =  "prec", n.points = 12, downscaledClimFile.baseline = "pr_CCSM_0k_down05res.txt", downOutput = "pr_CCSM_21k_down05res.txt")
+
+#   kriging.anomaly (newGridFile = "globalGrid_05resolution.txt", rawClimFile.baseline = "tas_CCSM_0k.txt", rawClimFile.pastFUT = "tas_CCSM_21k.txt", var =  "temp", n.points = 12, downscaledClimFile.baseline = "tas_CCSM_0k_down05res.txt", downOutput = "tas_CCSM_21k_down05res.txt")
