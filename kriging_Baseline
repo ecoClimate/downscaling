@@ -1,0 +1,112 @@
+
+##########################################################################################
+#########################################################
+#############################
+
+# Function "kriging.Baseline" spatially downscale control climates from PMIP3/CMIP5 database (see www.ecoclimate.org) using ordinary kriging method. Control climates are the climatic conditions simulated for base timeline, in this case current climates (pre-industrial, historical, modern), from which the climate change trends (anomalies; differences) from past or future conditions will be computed and downscaled using function "kriging.anomaly"
+
+#############################
+#########################################################
+##########################################################################################
+
+##### Follows a brief description, with examples, for each argument from function "kriging.Baseline"
+
+## newGridFile => file name (in .txt and in quotes, for example: "global_grid.txt") indicating the centroids of grid cells for which control climate should be downscaled. It can be as much columns as you interest (e.g. cells id), but it is mandatory that two columns are named "long" and "lat":
+
+#(example for a newGrid file)
+#     long    lat
+#   -112.0 -111.5
+#   -112.0 -111.5  
+#   -112.0 -111.5  
+#   -111.5 -111.0  
+#   -111.5 -111.0  
+#     ...    ...
+
+
+
+## rawClimFile => file name (in .txt and in quotes, for example: "pr_CCSM_0k.txt") indicating the monthly variable to be downscaled from CONTROL CLIMATES (pre-industrial, historical, modern). Such file must be 14 columns. It is mandatory that values for each month are in separated columns, as well as the spatial coordinates (long, lat), and that column names follow exactly the example below:
+
+	#(example for a rawClimFile)
+	#  long  lat    jan      fev      mar      abr      mai      jun      jul     ago      set      out      nov      dez
+	# 0.00  -90  4.089610 4.735232 6.441548 7.203468 7.052182 5.855716 5.673723 5.58491 6.276116 5.279049 4.488902 3.776155
+	# 1.25  -90  4.089322 4.735222 6.441547 7.203468 7.052182 5.855716 5.673723 5.58491 6.276116 5.279050 4.488889 3.775805
+	# 2.50  -90  4.089322 4.735240 6.441548 7.203468 7.052182 5.855716 5.673723 5.58491 6.276116 5.279050 4.488872 3.775640
+	# 3.75  -90  4.089715 4.735230 6.441548 7.203468 7.052182 5.855717 5.673723 5.58491 6.276116 5.279050 4.488895 3.775933
+	# 5.00  -90  4.089835 4.735240 6.441548 7.203468 7.052182 5.855717 5.673723 5.58491 6.276116 5.279050 4.488910 3.776165
+	# ...   ...    ...      ...      ...      ...       ...     ...       ...      ...     ...      ...     ...       ...
+
+   
+## nPoints => number of neighbor points around the focal cell should be considered to fit downscaling function (default indicates 12) 
+
+
+## downOutput => indicate the name for the file to be saved in your working directory containing downscaled control climate (with file extention .txt and in quotes, for example: "pr_CCSM0_0k_downscaled.txt") 
+
+
+
+
+kriging.Baseline <- function (newGridFile = " ", rawClimFile = " ", nPoints = 12, downOutput = " ")
+{
+
+	library(sp)
+	library(gstat)
+
+
+	#reading, testing and preparing files
+	
+	rawClim <- read.table(rawClimFile, h=T)
+	if (any(c(colnames(rawClim) == c("long", "lat", "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez")) == FALSE)) {
+		stop("Please, provide correct column names for *rawClim* file. It is mandatory the strict names as follow: ***  long, lat, jan, fev, mar, abr, mai, jun, jul, ago, set, out, nov, dez  ***")
+	} else {coordinates(rawClim) <- ~long+lat}
+		
+
+	newGrid <- read.table(newGridFile, h=T)
+	if ("long" %in% colnames(newGrid)) {
+		if ("lat" %in% colnames(newGrid))
+			gridded(newGrid) <- ~long+lat
+		else stop("Please, provide correct column names for *newGrid* file. It is mandatory *long* and *lat*")
+	} else stop("Please, provide correct column names for *newGrid* file. It is mandatory *long* and *lat*")
+
+
+
+
+	#fitting ordinary kriging and saving downscaled monthly variables
+	
+	downClim <- matrix(NA, nrow(newGrid), 14, dimnames = list(c(), c("long", "lat", "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez")))
+
+	for(i in 1:12){
+		if(i == 1) {v <- variogram(jan~1, rawClim); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = jan~1, rawClim, newGrid, model = m, nmax= nPoints)}
+		if(i == 2) {v <- variogram(fev~1, rawClim); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = fev~1, rawClim, newGrid, model = m, nmax= nPoints)}
+		if(i == 3) {v <- variogram(mar~1, rawClim); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = mar~1, rawClim, newGrid, model = m, nmax= nPoints)}
+		if(i == 4) {v <- variogram(abr~1, rawClim); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = abr~1, rawClim, newGrid, model = m, nmax= nPoints)}
+		if(i == 5) {v <- variogram(mai~1, rawClim); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = mai~1, rawClim, newGrid, model = m, nmax= nPoints)}
+		if(i == 6) {v <- variogram(jun~1, rawClim); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = jun~1, rawClim, newGrid, model = m, nmax= nPoints)}
+		if(i == 7) {v <- variogram(jul~1, rawClim); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = jul~1, rawClim, newGrid, model = m, nmax= nPoints)}
+		if(i == 8) {v <- variogram(ago~1, rawClim); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = ago~1, rawClim, newGrid, model = m, nmax= nPoints)}
+		if(i == 9) {v <- variogram(set~1, rawClim); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = set~1, rawClim, newGrid, model = m, nmax= nPoints)}
+		if(i == 10) {v <- variogram(out~1, rawClim); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = out~1, rawClim, newGrid, model = m, nmax= nPoints)}
+		if(i == 11) {v <- variogram(nov~1, rawClim); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = nov~1, rawClim, newGrid, model = m, nmax= nPoints)}
+		if(i == 12) {v <- variogram(dez~1, rawClim); m <- fit.variogram(v, vgm(1,"Sph",40,1)); down.kriging <- krige(formula = dez~1, rawClim, newGrid, model = m, nmax= nPoints)}
+	
+		downClim[,i+2] <- down.kriging@data$var1.pred
+	
+	}#ends for'i'
+
+
+	downClim[,1] <- down.kriging@coords[,1]
+	downClim[,2] <- down.kriging@coords[,2]
+
+	write.table(downClim, downOutput, row.names=F, sep=" ")
+
+}#ends function 'kriging.Baseline'
+
+
+############################
+
+
+
+# to start the downscaling, run function 'kriging.Baseline' using a command like follows below. Remember first to paste function to the R-console and to set working directory where files 'newGrid' and 'rawClim' are saved into.
+
+#(examples of a command to run function 'kriging.Baseline')
+#   kriging.Baseline (newGridFile = "globalGrid_05resolution.txt", rawClimFile = "pr_CCSM_0k.txt", nPoints = 12, downOutput = "pr_CCSM_0k_down05res.txt")
+
+# kriging.Baseline (newGridFile = "globalGrid_05resolution.txt", rawClimFile = "tas_CCSM_0k.txt", nPoints = 12, downOutput = "tas_CCSM_0k_down05res.txt")
