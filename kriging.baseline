@@ -3,7 +3,7 @@
 #########################################################
 #############################
 
-# Function "kriging.Baseline" spatially downscale control climates from PMIP3/CMIP5 database (see www.ecoclimate.org) using ordinary kriging method. Control climates are the climatic conditions simulated for base timeline, in this case current climates (pre-industrial, historical, modern), from which the climate change trends (anomalies; differences) from past or future conditions will be computed and downscaled using function "kriging.anomaly"
+# Function "kriging.baseline" spatially downscale control climates from PMIP3/CMIP5 database (see www.ecoclimate.org) using ordinary kriging method. Control climates are the climatic conditions simulated for base timeline, in this case current climates (pre-industrial, historical, modern), from which the climate change trends (anomalies; differences) from past or future conditions will be computed and downscaled using function "kriging.anomaly"
 
 #############################
 #########################################################
@@ -97,7 +97,7 @@ kriging.baseline <- function (newGridFile = " ", rawClimFile = " ", nPoints = 12
 
 	write.table(downClim, downOutput, row.names=F, sep=" ")
 
-}#ends function 'kriging.Baseline'
+}#ends function 'kriging.baseline'
 
 
 ############################
@@ -107,6 +107,6 @@ kriging.baseline <- function (newGridFile = " ", rawClimFile = " ", nPoints = 12
 # to start the downscaling, run function 'kriging.Baseline' using a command like follows below. Remember first to paste function to the R-console and to set working directory where files 'newGrid' and 'rawClim' are saved into.
 
 #(examples of a command to run function 'kriging.Baseline')
-#   kriging.Baseline (newGridFile = "globalGrid_05resolution.txt", rawClimFile = "pr_CCSM_0k.txt", nPoints = 12, downOutput = "pr_CCSM_0k_down05res.txt")
+#   kriging.baseline (newGridFile = "globalGrid_05resolution.txt", rawClimFile = "pr_CCSM_0k.txt", nPoints = 12, downOutput = "pr_CCSM_0k_down05res.txt")
 
-# kriging.Baseline (newGridFile = "globalGrid_05resolution.txt", rawClimFile = "tas_CCSM_0k.txt", nPoints = 12, downOutput = "tas_CCSM_0k_down05res.txt")
+#   kriging.baseline (newGridFile = "globalGrid_05resolution.txt", rawClimFile = "tas_CCSM_0k.txt", nPoints = 12, downOutput = "tas_CCSM_0k_down05res.txt")
